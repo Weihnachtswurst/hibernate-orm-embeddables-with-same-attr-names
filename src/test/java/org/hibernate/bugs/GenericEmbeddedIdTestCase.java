@@ -1,10 +1,8 @@
 package org.hibernate.bugs;
 
-import org.hibernate.bugs.entity.Employee;
-import org.hibernate.bugs.entity.EmployeeId_;
-import org.hibernate.bugs.entity.Employee_;
-import org.hibernate.bugs.entity.Visitor;
-import org.hibernate.bugs.entity.Visitor_;
+import org.hibernate.bugs.entity.Material;
+import org.hibernate.bugs.entity.Weight;
+import org.hibernate.bugs.entity.Length;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +21,24 @@ class GenericEmbeddedIdTestCase {
     @BeforeEach
     void init() {
         entityManagerFactory = Persistence.createEntityManagerFactory("templatePU");
+
+        final var material = new Material();
+        material.setId(1L);
+
+        final var weight = new Weight();
+        weight.setValue("WeightValue");
+        material.setWeight(weight);
+
+        final var length = new Length();
+        length.setValue("LengthValue");
+        material.setLength(length);
+
+        final var entityManager = entityManagerFactory.createEntityManager();
+
+        entityManager.getTransaction().begin();
+        entityManager.persist(material);
+        entityManager.flush();
+        entityManager.getTransaction().commit();
     }
 
     @AfterEach
@@ -30,63 +46,42 @@ class GenericEmbeddedIdTestCase {
         entityManagerFactory.close();
     }
 
-    //  Compilation Fails with:
-    //  no suitable method found for get(jakarta.persistence.metamodel.SingularAttribute<org.hibernate.bugs.entity.EmployeeId,org.hibernate.bugs.entity.PersonId>)
     @Test
-    void testCompareUsingCriteriaStaticMetamodel() throws Exception {
-        var criteriaBuilder = entityManagerFactory.getCriteriaBuilder();
-        var query = criteriaBuilder.createQuery(Employee.class);
+    void testPlainEntitySelect() {
+        var result = entityManagerFactory.createEntityManager()
+            .createQuery("select m from Material m")
+            .getResultList();
 
-        var employee = query.from(Employee.class);
-        var visitor = query.from(Visitor.class);
+        Assertions.assertEquals(1, result.size());
 
-        var visitorPersonId = visitor.get(Visitor_.id);
-        var employeePersonId = employee.get(Employee_.id).get(EmployeeId_.personId);
-
-        var equal = criteriaBuilder.equal(employeePersonId, visitorPersonId);
-
-        Assertions.assertDoesNotThrow(() -> query.select(employee).where(equal));
+        var item = (Material)result.get(0);
+        Assertions.assertEquals("WeightValue", item.getWeight().getValue());
+        Assertions.assertEquals("LengthValue", item.getLength().getValue()); // <- Fails because this is "WeightValue" for some reason
     }
 
     @Test
-    //  Fails with:
-    //  Semantic Cannot compare tuples of different lengths
-    void testCompareUsingCriteriaAttributeNames() throws Exception {
-        var entityManager = entityManagerFactory.createEntityManager();
-        var criteriaBuilder = entityManager.getCriteriaBuilder();
-        var query = criteriaBuilder.createQuery(Employee.class);
+    void testEmbeddedValuesSelect() {
+        var result = entityManagerFactory.createEntityManager()
+                .createQuery("select q.weight, q.length from (select m.weight as weight, m.length as length from Material m) q")
+                .getResultList();
 
-        var employee = query.from(Employee.class);
-        var visitor = query.from(Visitor.class);
+        Assertions.assertEquals(1, result.size());
 
-        var equal = criteriaBuilder.equal(employee.get(Employee_.ID).get(EmployeeId_.PERSON_ID), visitor.get(Visitor_.ID));
-
-        // Select every Employee Entity that is also a Visitor
-        query.select(employee).where(equal);
-
-        Assertions.assertDoesNotThrow(() -> entityManager.createQuery(query)
-                .getResultStream()
-                .toList());
+        var item = (Object[]) result.get(0);
+        Assertions.assertEquals("WeightValue", ((Weight)item[0]).getValue());
+        Assertions.assertEquals("LengthValue", ((Length)item[1]).getValue());
     }
 
     @Test
-    // Fails with:
-    // Semantic Cannot compare tuples of different lengths
-    void testCompareUsingJpql() throws Exception {
-        var entityManager = entityManagerFactory.createEntityManager();
-        var criteriaBuilder = entityManager.getCriteriaBuilder();
-        var query = criteriaBuilder.createQuery(Employee.class);
+    void testScalarValuesSelect() {
+        var result = entityManagerFactory.createEntityManager()
+                .createQuery("select q.weight, q.length from (select m.weight.value as weight, m.length.value as length from Material m) q")
+                .getResultList();
 
-        var employee = query.from(Employee.class);
-        var visitor = query.from(Visitor.class);
+        Assertions.assertEquals(1, result.size());
 
-        var equal = criteriaBuilder.equal(employee.get(Employee_.ID).get(EmployeeId_.PERSON_ID), visitor.get(Visitor_.ID));
-
-        // Select every Employee Entity that is also a Visitor
-        query.select(employee).where(equal);
-
-        Assertions.assertDoesNotThrow(() -> entityManager.createQuery(query)
-                .getResultStream()
-                .toList());
+        var item = (Object[]) result.get(0);
+        Assertions.assertEquals("WeightValue", ((String)item[0]));
+        Assertions.assertEquals("LengthValue", ((String)item[1]));
     }
 }
