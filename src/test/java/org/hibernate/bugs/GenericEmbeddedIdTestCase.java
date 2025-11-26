@@ -56,7 +56,7 @@ class GenericEmbeddedIdTestCase {
 
         var item = (Material)result.get(0);
         Assertions.assertEquals("WeightValue", item.getWeight().getValue());
-        Assertions.assertEquals("LengthValue", item.getLength().getValue()); // <- Fails because this is "WeightValue" for some reason
+        Assertions.assertEquals("LengthValue", item.getLength().getValue());
     }
 
     @Test
@@ -69,7 +69,7 @@ class GenericEmbeddedIdTestCase {
 
         var item = (Object[]) result.get(0);
         Assertions.assertEquals("WeightValue", ((Weight)item[0]).getValue());
-        Assertions.assertEquals("LengthValue", ((Length)item[1]).getValue());
+        Assertions.assertEquals("LengthValue", ((Length)item[1]).getValue()); // <- Fails because this is "WeightValue" for some reason
     }
 
     @Test
