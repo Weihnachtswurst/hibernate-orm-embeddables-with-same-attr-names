@@ -60,7 +60,7 @@ class GenericEmbeddedIdTestCase {
     }
 
     @Test
-    void testEmbeddedValuesSelect() {
+    void testEmbeddedValuesNestedSelect() {
         var result = entityManagerFactory.createEntityManager()
                 .createQuery("select q.weight, q.length from (select m.weight as weight, m.length as length from Material m) q")
                 .getResultList();
@@ -73,7 +73,20 @@ class GenericEmbeddedIdTestCase {
     }
 
     @Test
-    void testScalarValuesSelect() {
+    void testEmbeddedValuesSelect() {
+        var result = entityManagerFactory.createEntityManager()
+                .createQuery("select m.weight, m.length from Material m")
+                .getResultList();
+
+        Assertions.assertEquals(1, result.size());
+
+        var item = (Object[]) result.get(0);
+        Assertions.assertEquals("WeightValue", ((Weight)item[0]).getValue());
+        Assertions.assertEquals("LengthValue", ((Length)item[1]).getValue()); // <- Fails because this is "WeightValue" for some reason
+    }
+
+    @Test
+    void testScalarValuesNestedSelect() {
         var result = entityManagerFactory.createEntityManager()
                 .createQuery("select q.weight, q.length from (select m.weight.value as weight, m.length.value as length from Material m) q")
                 .getResultList();
